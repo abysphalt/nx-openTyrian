@@ -1,4 +1,4 @@
-/* 
+/*
  * OpenTyrian: A modern cross-platform port of Tyrian
  * Copyright (C) 2007-2009  The OpenTyrian Development Team
  *
@@ -25,6 +25,8 @@
 
 #include <assert.h>
 
+#include "keyboard.h"
+
 static Uint32 rgb_to_yuv( int r, int g, int b );
 
 #define PALETTE_COUNT 23
@@ -40,10 +42,10 @@ Palette colors;
 void JE_loadPals( void )
 {
 	FILE *f = dir_fopen_die(data_dir(), "palette.dat", "rb");
-	
+
 	palette_count = ftell_eof(f) / (256 * 3);
 	assert(palette_count == PALETTE_COUNT);
-	
+
 	for (int p = 0; p < palette_count; ++p)
 	{
 		for (int i = 0; i < 256; ++i)
@@ -61,7 +63,7 @@ void JE_loadPals( void )
 			palettes[p][i].b = (rgb[2] << 2) | (rgb[2] >> 4);
 		}
 	}
-	
+
 	fclose(f);
 }
 
@@ -108,19 +110,19 @@ void init_step_fade_solid( int diff[256][3], SDL_Color color, unsigned int first
 void step_fade_palette( int diff[256][3], int steps, unsigned int first_color, unsigned int last_color )
 {
 	assert(steps > 0);
-	
+
 	for (unsigned int i = first_color; i <= last_color; i++)
 	{
 		int delta[3] = { diff[i][0] / steps, diff[i][1] / steps, diff[i][2] / steps };
-		
+
 		diff[i][0] -= delta[0];
 		diff[i][1] -= delta[1];
 		diff[i][2] -= delta[2];
-		
+
 		palette[i].r += delta[0];
 		palette[i].g += delta[1];
 		palette[i].b += delta[2];
-		
+
 		rgb_palette[i] = SDL_MapRGB(main_window_tex_format, palette[i].r, palette[i].g, palette[i].b);
 		yuv_palette[i] = rgb_to_yuv(palette[i].r, palette[i].g, palette[i].b);
 	}
@@ -130,39 +132,43 @@ void step_fade_palette( int diff[256][3], int steps, unsigned int first_color, u
 void fade_palette( Palette colors, int steps, unsigned int first_color, unsigned int last_color )
 {
 	assert(steps > 0);
-	
+
 	static int diff[256][3];
 	init_step_fade_palette(diff, colors, first_color, last_color);
-	
+
 	for (; steps > 0; steps--)
 	{
 		setdelay(1);
-		
+
 		step_fade_palette(diff, steps, first_color, last_color);
-		
+
 		JE_showVGA();
-		
+
 		wait_delay();
 	}
+	// fix stuck key presses when changing screens.
+	service_SDL_events(true);
 }
 
 void fade_solid( SDL_Color color, int steps, unsigned int first_color, unsigned int last_color )
 {
 	assert(steps > 0);
-	
+
 	static int diff[256][3];
 	init_step_fade_solid(diff, color, first_color, last_color);
-	
+
 	for (; steps > 0; steps--)
 	{
 		setdelay(1);
-		
+
 		step_fade_palette(diff, steps, first_color, last_color);
-		
+
 		JE_showVGA();
-		
+
 		wait_delay();
 	}
+	// fix stuck key presses when changing screens.
+	service_SDL_events(true);
 }
 
 void fade_black( int steps )

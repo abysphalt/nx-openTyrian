@@ -162,7 +162,7 @@ inline static void blit_enemy( SDL_Surface *surface, unsigned int i, signed int 
 		fprintf(stderr, "warning: enemy %d sprite missing\n", i);
 		return;
 	}
-	
+
 	const int x = enemy[i].ex + x_offset + tempMapXOfs,
 	          y = enemy[i].ey + y_offset;
 	const unsigned int index = enemy[i].egr[enemy[i].enemycycle - 1] + sprite_offset;
@@ -753,11 +753,11 @@ start_level_first:
 			player[i].old_x[j] = player[i].x - (19 - j);
 			player[i].old_y[j] = player[i].y - 18;
 		}
-		
+
 		player[i].last_x_shot_move = player[i].x;
 		player[i].last_y_shot_move = player[i].y;
 	}
-	
+
 	JE_loadPic(VGAScreen, twoPlayerMode ? 6 : 3, false);
 
 	JE_drawOptions();
@@ -1243,7 +1243,7 @@ level_loop:
 					fill_rectangle_xy(VGAScreenSeg, 269, 113 - 11 - temp, 276, 114 - 11 - lastPower, 113 + temp / 7);
 				else
 					fill_rectangle_xy(VGAScreenSeg, 269, 113 - 11 - lastPower, 276, 114 - 11 - temp, 0);
-				
+
 				lastPower = temp;
 			}
 		}
@@ -1449,7 +1449,7 @@ level_loop:
 			JE_byte playerNum;
 			JE_word tempX2, tempY2;
 			JE_integer damage;
-			
+
 			if (!player_shot_move_and_draw(z, &is_special, &tempShotX, &tempShotY, &damage, &temp2, &chain, &playerNum, &tempX2, &tempY2))
 			{
 				goto draw_player_shot_loop_end;
@@ -1758,15 +1758,15 @@ draw_player_shot_loop_end:
 		player[i].last_x_shot_move = player[i].x;
 		player[i].last_y_shot_move = player[i].y;
 	}
-	
+
 	/*=================================*/
 	/*=======Collisions Detection======*/
 	/*=================================*/
-	
+
 	for (uint i = 0; i < (twoPlayerMode ? 2 : 1); ++i)
 		if (player[i].is_alive && !endLevel)
 			JE_playerCollide(&player[i], i + 1);
-	
+
 	if (firstGameOver)
 		JE_mainGamePlayerFunctions();      /*--------PLAYER DRAW+MOVEMENT---------*/
 
@@ -3521,7 +3521,7 @@ bool JE_titleScreen( JE_boolean animate )
 				switch (lastkey_scan)
 				{
 				case SDL_SCANCODE_ESCAPE:
-					quit = true;
+					//quit = true;
 					break;
 				case SDL_SCANCODE_RETURN:
 					JE_playSampleNum(S_SELECT);
@@ -3529,7 +3529,7 @@ bool JE_titleScreen( JE_boolean animate )
 					{
 					case 0: /* New game */
 						fade_black(10);
-						
+
 						if (select_gameplay())
 						{
 							if (select_episode() && select_difficulty())
@@ -3547,11 +3547,11 @@ bool JE_titleScreen( JE_boolean animate )
 							{
 								for (uint i = 0; i < COUNTOF(player); ++i)
 									player[i].cash = 0;
-								
+
 								player[0].items.ship = 11;  // Silver Ship
-								
+
 								difficultyLevel++;
-								
+
 								inputDevice[0] = 1;
 								inputDevice[1] = 2;
 							}
@@ -3562,7 +3562,7 @@ bool JE_titleScreen( JE_boolean animate )
 							else if (gameLoaded)
 							{
 								// allows player to smuggle arcade/super-arcade ships into full game
-								
+
 								ulong initial_cash[] = { 10000, 15000, 20000, 30000 };
 
 								assert(episodeNum >= 1 && episodeNum <= EPISODE_AVAILABLE);
@@ -3731,7 +3731,7 @@ Sint16 JE_newEnemy( int enemyOffset, Uint16 eDatI, Sint16 uniqueShapeTableI )
 			return i + 1;
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -3755,12 +3755,12 @@ uint JE_makeEnemy( struct JE_SingleEnemyType *enemy, Uint16 eDatI, Sint16 unique
 	{
 		shapeTableI = enemyDat[eDatI].shapebank;
 	}
-	
+
 	Sprite2_array *sprite2s = NULL;
 	for (uint i = 0; i < 6; ++i)
 		if (shapeTableI == enemyShapeTables[i])
 			sprite2s = &eShapes[i];
-	
+
 	if (sprite2s != NULL)
 		enemy->sprite2s = sprite2s;
 	else
@@ -4192,7 +4192,7 @@ void JE_eventSystem( void )
 				eventRec[eventLoc-1].eventdat3 > 0 ? eventRec[eventLoc-1].eventdat3 : 0,
 				eventRec[eventLoc-1].eventdat4 > 0 ? eventRec[eventLoc-1].eventdat4 : 0,
 			};
-			
+
 			for (unsigned int i = 0; i < COUNTOF(newEnemyShapeTables); ++i)
 			{
 				if (enemyShapeTables[i] != newEnemyShapeTables[i])
