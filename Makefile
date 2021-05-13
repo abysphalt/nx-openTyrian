@@ -1,139 +1,184 @@
-# BUILD SETTINGS ###############################################################
+#---------------------------------------------------------------------------------
+.SUFFIXES:
+#---------------------------------------------------------------------------------
 
-ifneq ($(filter Msys Cygwin, $(shell uname -o)), )
-    PLATFORM := WIN32
-    TYRIAN_DIR = C:\\TYRIAN
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
+endif
+
+TOPDIR ?= $(CURDIR)
+include $(DEVKITPRO)/libnx/switch_rules
+
+#---------------------------------------------------------------------------------
+# TARGET is the name of the output
+# BUILD is the directory where object files & intermediate files will be placed
+# SOURCES is a list of directories containing source code
+# DATA is a list of directories containing data files
+# INCLUDES is a list of directories containing header files
+# EXEFS_SRC is the optional input directory containing data copied into exefs, if anything this normally should only contain "main.npdm".
+#
+# NO_ICON: if set to anything, do not use icon.
+# NO_NACP: if set to anything, no .nacp file is generated.
+# APP_TITLE is the name of the app stored in the .nacp file (Optional)
+# APP_AUTHOR is the author of the app stored in the .nacp file (Optional)
+# APP_VERSION is the version of the app stored in the .nacp file (Optional)
+# APP_TITLEID is the titleID of the app stored in the .nacp file (Optional)
+# ICON is the filename of the icon (.jpg), relative to the project folder.
+#   If not set, it attempts to use one of the following (in this order):
+#     - <Project name>.jpg
+#     - icon.jpg
+#     - <libnx folder>/default_icon.jpg
+#---------------------------------------------------------------------------------
+APP_TITLE	:=	Open Tyrian $(VERSION)
+APP_AUTHOR	:=	Switch Port by CTF + blade.sk
+APP_VERSION	:=	1.0.2
+#---------------------------------------------------------------------------------
+TARGET		:=	opentyrian
+BUILD		:=	build
+SOURCES		:=	src
+INCLUDES	:=	include
+EXEFS_SRC	:=	exefs_src
+TYRIAN_DIR  :=  tyrian
+ROMFS = data
+
+#---------------------------------------------------------------------------------
+# options for code generation
+#---------------------------------------------------------------------------------
+ARCH		:=	-march=armv8-a -mtp=soft -fPIE
+CFLAGS		:=	-g -Wall -O2 \
+				-ffast-math \
+				$(ARCH) $(DEFINES)
+CFLAGS  	+=	-D__SWITCH__ $(INCLUDE) `sdl2-config --cflags` -DTYRIAN_DIR='"$(TYRIAN_DIR)"' -DHG_REV='"v$(APP_VERSION)"'
+CXXFLAGS	:=  $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
+ASFLAGS		:=	-g $(ARCH)
+LDFLAGS		:=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LIBS		:=  `sdl2-config --libs` -lnx -lstdc++ -lm
+
+#---------------------------------------------------------------------------------
+# list of directories containing libraries, this must be the top level containing
+# include and lib
+#---------------------------------------------------------------------------------
+LIBDIRS	:= $(PORTLIBS) $(LIBNX)
+
+
+#---------------------------------------------------------------------------------
+# no real need to edit anything past this point unless you need to add additional
+# rules for different file extensions
+#---------------------------------------------------------------------------------
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+#---------------------------------------------------------------------------------
+
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export TOPDIR	:=	$(CURDIR)
+
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
+			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+
+export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+
+#---------------------------------------------------------------------------------
+# use CXX for linking C++ projects, CC for standard C
+#---------------------------------------------------------------------------------
+ifeq ($(strip $(CPPFILES)),)
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CC)
+#---------------------------------------------------------------------------------
 else
-    PLATFORM := UNIX
-    TYRIAN_DIR = $(gamesdir)/tyrian
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CXX)
+#---------------------------------------------------------------------------------
 endif
+#---------------------------------------------------------------------------------
 
-WITH_NETWORK := true
+export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
+			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
-################################################################################
+export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+			-I$(CURDIR)/$(BUILD)
 
-# see https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
+export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-SHELL = /bin/sh
+export BUILD_EXEFS_SRC := $(TOPDIR)/$(EXEFS_SRC)
 
-CC ?= gcc
-INSTALL ?= install
-PKG_CONFIG ?= pkg-config
-
-VCS_IDREV ?= (git describe --tags || git rev-parse --short HEAD)
-
-INSTALL_PROGRAM ?= $(INSTALL)
-INSTALL_DATA ?= $(INSTALL) -m 644
-
-prefix ?= /usr/local
-exec_prefix ?= $(prefix)
-
-bindir ?= $(exec_prefix)/bin
-datarootdir ?= $(prefix)/share
-datadir ?= $(datarootdir)
-docdir ?= $(datarootdir)/doc/opentyrian
-mandir ?= $(datarootdir)/man
-man6dir ?= $(mandir)/man6
-man6ext ?= .6
-
-# see http://www.pathname.com/fhs/pub/fhs-2.3.html
-
-gamesdir ?= $(datadir)/games
-
-###
-
-TARGET := opentyrian
-
-SRCS := $(wildcard src/*.c)
-OBJS := $(SRCS:src/%.c=obj/%.o)
-DEPS := $(SRCS:src/%.c=obj/%.d)
-
-###
-
-ifeq ($(WITH_NETWORK), true)
-    EXTRA_CPPFLAGS += -DWITH_NETWORK
-endif
-
-OPENTYRIAN_VERSION := $(shell $(VCS_IDREV) 2>/dev/null && \
-                              touch src/opentyrian_version.h)
-ifneq ($(OPENTYRIAN_VERSION), )
-    EXTRA_CPPFLAGS += -DOPENTYRIAN_VERSION='"$(OPENTYRIAN_VERSION)"'
-endif
-
-CPPFLAGS ?= -MMD
-CPPFLAGS += -DNDEBUG
-CFLAGS ?= -pedantic \
-          -Wall \
-          -Wextra \
-          -Wno-missing-field-initializers \
-          -O2
-LDFLAGS ?=
-LDLIBS ?=
-
-ifeq ($(WITH_NETWORK), true)
-    SDL_CPPFLAGS := $(shell $(PKG_CONFIG) sdl2 SDL2_net --cflags)
-    SDL_LDFLAGS := $(shell $(PKG_CONFIG) sdl2 SDL2_net --libs-only-L --libs-only-other)
-    SDL_LDLIBS := $(shell $(PKG_CONFIG) sdl2 SDL2_net --libs-only-l)
+ifeq ($(strip $(ICON)),)
+	icons := $(wildcard *.jpg)
+	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
+		export APP_ICON := $(TOPDIR)/$(TARGET).jpg
+	else
+		ifneq (,$(findstring icon.jpg,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.jpg
+		endif
+	endif
 else
-    SDL_CPPFLAGS := $(shell $(PKG_CONFIG) sdl2 --cflags)
-    SDL_LDFLAGS := $(shell $(PKG_CONFIG) sdl2 --libs-only-L --libs-only-other)
-    SDL_LDLIBS := $(shell $(PKG_CONFIG) sdl2 --libs-only-l)
+	export APP_ICON := $(TOPDIR)/$(ICON)
 endif
 
-ALL_CPPFLAGS = -DTARGET_$(PLATFORM) \
-               -DTYRIAN_DIR='"$(TYRIAN_DIR)"' \
-               $(EXTRA_CPPFLAGS) \
-               $(SDL_CPPFLAGS) \
-               $(CPPFLAGS)
-ALL_CFLAGS = -std=iso9899:1999 \
-             $(CFLAGS)
-ALL_LDFLAGS = $(SDL_LDFLAGS) \
-              $(LDFLAGS)
-ALL_LDLIBS = -lm \
-             $(SDL_LDLIBS) \
-             $(LDLIBS)
+ifeq ($(strip $(NO_ICON)),)
+	export NROFLAGS += --icon=$(APP_ICON)
+endif
 
-###
+ifeq ($(strip $(NO_NACP)),)
+	export NROFLAGS += --nacp=$(CURDIR)/$(TARGET).nacp
+endif
 
-.PHONY : all
-all : $(TARGET)
+ifneq ($(APP_TITLEID),)
+	export NACPFLAGS += --titleid=$(APP_TITLEID)
+endif
 
-.PHONY : debug
-debug : CPPFLAGS += -UNDEBUG
-debug : CFLAGS += -Werror
-debug : CFLAGS += -O0
-debug : CFLAGS += -g3
-debug : all
+.PHONY: $(BUILD) clean all
 
-.PHONY : installdirs
-installdirs :
-	mkdir -p $(DESTDIR)$(bindir)
-	mkdir -p $(DESTDIR)$(docdir)
-	mkdir -p $(DESTDIR)$(man6dir)
+#---------------------------------------------------------------------------------
+all: $(BUILD)
 
-.PHONY : install
-install : $(TARGET) installdirs
-	$(INSTALL_PROGRAM) $(TARGET) $(DESTDIR)$(bindir)/
-	$(INSTALL_DATA) CREDITS NEWS README $(DESTDIR)$(docdir)/
-	$(INSTALL_DATA) linux/man/opentyrian.6 $(DESTDIR)$(man6dir)/opentyrian$(man6ext)
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-.PHONY : uninstall
-uninstall :
-	rm -f $(DESTDIR)$(bindir)/$(TARGET)
-	rm -f $(DESTDIR)$(docdir)/{CREDITS,NEWS,README}
-	rm -f $(DESTDIR)$(man6dir)/opentyrian$(man6ext)
+#---------------------------------------------------------------------------------
+clean:
+	@echo clean ...
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nacp $(TARGET).elf
 
-.PHONY : clean
-clean :
-	rm -f $(OBJS)
-	rm -f $(DEPS)
-	rm -f $(TARGET)
 
-$(TARGET) : $(OBJS)
-	$(CC) $(ALL_CFLAGS) $(ALL_LDFLAGS) -o $@ $^ $(ALL_LDLIBS)
+#---------------------------------------------------------------------------------
+else
+.PHONY:	all
 
--include $(DEPS)
+DEPENDS	:=	$(OFILES:.o=.d)
 
-obj/%.o : src/%.c
-	@mkdir -p "$(dir $@)"
-	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c -o $@ $<
+#---------------------------------------------------------------------------------
+# main targets
+#---------------------------------------------------------------------------------
+all	:	$(OUTPUT).pfs0 $(OUTPUT).nro
+
+$(OUTPUT).pfs0	:	$(OUTPUT).nso
+
+$(OUTPUT).nso	:	$(OUTPUT).elf
+
+ifeq ($(strip $(NO_NACP)),)
+$(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
+else
+$(OUTPUT).nro	:	$(OUTPUT).elf
+endif
+
+$(OUTPUT).elf	:	$(OFILES)
+
+#---------------------------------------------------------------------------------
+# you need a rule like this for each extension you use as binary data
+#---------------------------------------------------------------------------------
+%.bin.o	:	%.bin
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@$(bin2o)
+
+-include $(DEPENDS)
+
+#---------------------------------------------------------------------------------------
+endif
+#---------------------------------------------------------------------------------------
